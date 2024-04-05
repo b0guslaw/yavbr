@@ -449,27 +449,76 @@ void Application::cleanupSwapChain()
 	m_device.destroySwapchainKHR(m_swapchain);
 }
 
-void Application::createVertexBuffer()
+void Application::createBuffer(vk::DeviceSize size,
+	vk::BufferUsageFlags usage,
+	vk::MemoryPropertyFlags properties,
+	vk::Buffer& buffer,
+	vk::DeviceMemory& bufferMemory)
 {
 	vk::BufferCreateInfo bufferCreateInfo({},
 		sizeof(m_vertices[0]) * m_vertices.size(),
-		vk::BufferUsageFlagBits::eVertexBuffer,
+		usage,
 		vk::SharingMode::eExclusive);
 
-	m_vertexBuffer = m_device.createBuffer(bufferCreateInfo);
+	buffer = m_device.createBuffer(bufferCreateInfo);
 
-	auto memoryRequirements = m_device.getBufferMemoryRequirements(m_vertexBuffer);
+	auto memoryRequirements = m_device.getBufferMemoryRequirements(buffer);
 
 	vk::MemoryAllocateInfo allocateInfo(
 		memoryRequirements.size,
 		findMemoryType(memoryRequirements.memoryTypeBits,
 			vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent));
-	m_vertexBufferMemory = m_device.allocateMemory(allocateInfo);
-	m_device.bindBufferMemory(m_vertexBuffer, m_vertexBufferMemory, 0);
+	bufferMemory = m_device.allocateMemory(allocateInfo);
+	m_device.bindBufferMemory(buffer, bufferMemory, 0);
+}
 
-	void* data = m_device.mapMemory(m_vertexBufferMemory, 0, bufferCreateInfo.size);
-	memcpy(data, m_vertices.data(), (std::size_t)bufferCreateInfo.size);
-	m_device.unmapMemory(m_vertexBufferMemory);
+void Application::createVertexBuffer()
+{
+	vk::DeviceSize bufferSize = sizeof(m_vertices[0]) * m_vertices.size();
+
+	vk::Buffer stagingBuffer;
+	vk::DeviceMemory stagingBufferMemory;
+
+	createBuffer(bufferSize, 
+		vk::BufferUsageFlagBits::eTransferSrc,
+		vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+		stagingBuffer,
+		stagingBufferMemory);
+
+	void* data = m_device.mapMemory(stagingBufferMemory, 0, bufferSize);
+	memcpy(data, m_vertices.data(), (std::size_t)bufferSize);
+	m_device.unmapMemory(stagingBufferMemory);
+
+	createBuffer(bufferSize,
+		vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer,
+		vk::MemoryPropertyFlagBits::eDeviceLocal,
+		m_vertexBuffer,
+		m_vertexBufferMemory);
+
+	copyBuffer(stagingBuffer, m_vertexBuffer, bufferSize);
+	m_device.destroyBuffer(stagingBuffer);
+	m_device.freeMemory(stagingBufferMemory);
+}
+
+void Application::copyBuffer(vk::Buffer src, vk::Buffer dst, vk::DeviceSize size)
+{
+	vk::CommandBufferAllocateInfo allocateInfo(m_commandPool, vk::CommandBufferLevel::ePrimary, 1);
+	auto commandBuffer = m_device.allocateCommandBuffers(allocateInfo).front();
+
+	vk::CommandBufferBeginInfo beginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+	commandBuffer.begin(beginInfo);
+
+	vk::BufferCopy copyRegion(0, 0, size);
+	commandBuffer.copyBuffer(src, dst, copyRegion);
+	commandBuffer.end();
+
+	vk::SubmitInfo submitInfo;
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &commandBuffer;
+
+	m_graphicsQueue.submit(submitInfo);
+	m_graphicsQueue.waitIdle();
+	m_device.freeCommandBuffers(m_commandPool, commandBuffer);
 }
 
 std::vector<char> Application::readFile(const std::string& filename)

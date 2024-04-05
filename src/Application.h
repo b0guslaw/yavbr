@@ -102,7 +102,9 @@ private:
 	void createSyncObjects();
 	void recreateSwapChain();
 	void cleanupSwapChain();
+	void createBuffer(vk::DeviceSize, vk::BufferUsageFlags, vk::MemoryPropertyFlags, vk::Buffer&, vk::DeviceMemory&);
 	void createVertexBuffer();
+	void copyBuffer(vk::Buffer, vk::Buffer, vk::DeviceSize);
 	std::vector<char> readFile(const std::string&);
 	vk::ShaderModule createShaderModule(const std::vector<char>&);
 
