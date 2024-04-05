@@ -1,9 +1,13 @@
 # Build files
 build*/
 .cache/
+x64/
 
 # Development related items
 .vscode/
+.vs/
+*.vcxproj*
+*.sln
 
 # Project related artifacts
 *.spv
