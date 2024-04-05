@@ -1,0 +1,9 @@
+# Build files
+build*/
+.cache/
+
+# Development related items
+.vscode/
+
+# Project related artifacts
+*.spv
