@@ -77,21 +77,18 @@ void Application::mainLoop()
 
 void Application::cleanUp()
 {
-	for (std::size_t i{0}; i < MAX_FRAMES_IN_FLIGHT; i++) {
-		m_device.destroySemaphore(m_imageAvailabeSemaphores[i]);
-		m_device.destroySemaphore(m_renderFinishedSemaphores[i]);
-		m_device.destroyFence(m_inFlightFences[i]);
-	}
-
-	m_device.destroyCommandPool(m_commandPool);
-
 	cleanupSwapChain();
+
+	m_device.destroyPipeline(m_graphicsPipeline);
+	m_device.destroyPipelineLayout(m_pipelineLayout);
+	m_device.destroyRenderPass(m_renderPass);
 
 	for (std::size_t i{0}; i < MAX_FRAMES_IN_FLIGHT; i++) {
 		m_device.destroyBuffer(m_uniformBuffers[i]);
 		m_device.freeMemory(m_uniformBuffersMemory[i]);
 	}
 
+	m_device.destroyDescriptorPool(m_descriptorPool);
 	m_device.destroyDescriptorSetLayout(m_descriptorSetLayout);
 
 	m_device.destroyBuffer(m_vertexBuffer);
@@ -99,9 +96,13 @@ void Application::cleanUp()
 	m_device.destroyBuffer(m_indexBuffer);
 	m_device.freeMemory(m_indexBufferMemory);
 
-	m_device.destroyPipeline(m_graphicsPipeline);
-	m_device.destroyPipelineLayout(m_pipelineLayout);
-	m_device.destroyRenderPass(m_renderPass);
+	for (std::size_t i{0}; i < MAX_FRAMES_IN_FLIGHT; i++) {
+		m_device.destroySemaphore(m_imageAvailabeSemaphores[i]);
+		m_device.destroySemaphore(m_renderFinishedSemaphores[i]);
+		m_device.destroyFence(m_inFlightFences[i]);
+	}
+
+	m_device.destroyCommandPool(m_commandPool);
 
 	m_device.destroy();
 
