@@ -14,6 +14,7 @@
 #include <GLFW/glfw3native.h>
 #endif
 
+#define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
 
 #include <optional>
@@ -41,6 +42,12 @@ struct Vertex {
 		}};
 		return attributeDescriptions;
 	}
+};
+
+struct UniformBufferObject {
+	glm::mat4 model;
+	glm::mat4 view;
+	glm::mat4 proj;
 };
 
 inline VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pCallback) {
@@ -95,6 +102,7 @@ private:
 	void createImageViews();
 	void createRenderPass();
 	void createGraphicsPipeline();
+	void createDescriptorSetLayout();
 	void createFramebuffers();
 	void createCommandPool();
 	void createCommandBuffers();
@@ -104,6 +112,10 @@ private:
 	void cleanupSwapChain();
 	void createBuffer(vk::DeviceSize, vk::BufferUsageFlags, vk::MemoryPropertyFlags, vk::Buffer&, vk::DeviceMemory&);
 	void createVertexBuffer();
+	void createIndexBuffer();
+	void createUniformBuffers();
+	void createDescriptorPool();
+	void createDescriptorSet();
 	void copyBuffer(vk::Buffer, vk::Buffer, vk::DeviceSize);
 	std::vector<char> readFile(const std::string&);
 	vk::ShaderModule createShaderModule(const std::vector<char>&);
@@ -112,6 +124,7 @@ private:
 	bool deviceHasExtensionSupport(vk::PhysicalDevice);
 
 	void drawFrame();
+	void updateUniformBuffer(std::uint32_t);
 
 	QueueFamilyIndices findQueueFamilies(vk::PhysicalDevice);
 	vk::SurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormatKHR>&);
@@ -151,6 +164,7 @@ private:
 	vk::Format m_swapchainImageFormat;
 	vk::Extent2D m_swapchainExtent;
 	vk::RenderPass m_renderPass;
+	vk::DescriptorSetLayout m_descriptorSetLayout;
 	vk::PipelineLayout m_pipelineLayout;
 	vk::Pipeline m_graphicsPipeline;
 	vk::CommandPool m_commandPool;
@@ -167,4 +181,15 @@ private:
 	vk::Buffer m_vertexBuffer;
 	vk::DeviceMemory m_vertexBufferMemory;
 	std::vector<Vertex> m_vertices;
+
+	vk::Buffer m_indexBuffer;
+	vk::DeviceMemory m_indexBufferMemory;
+	std::vector<std::uint16_t> m_indices;
+	
+	std::vector<vk::Buffer> m_uniformBuffers;
+	std::vector<vk::DeviceMemory> m_uniformBuffersMemory;
+	std::vector<void*> m_uniformBuffersMapped;
+
+	vk::DescriptorPool m_descriptorPool;
+	std::vector<vk::DescriptorSet> m_descriptorSets;
 };
