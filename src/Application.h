@@ -23,6 +23,7 @@
 struct Vertex {
 	glm::vec2 pos;
 	glm::vec3 color;
+	glm::vec2 texCoord;
 
 	static vk::VertexInputBindingDescription getBindingDescription() {
 		vk::VertexInputBindingDescription bindingDescription
@@ -34,11 +35,12 @@ struct Vertex {
 		return bindingDescription;
 	}
 
-	static std::array<vk::VertexInputAttributeDescription, 2> getAttributeDescription() {
-		std::array<vk::VertexInputAttributeDescription, 2> attributeDescriptions
+	static std::array<vk::VertexInputAttributeDescription, 3> getAttributeDescription() {
+		std::array<vk::VertexInputAttributeDescription, 3> attributeDescriptions
 		{{
 			{0, 0, vk::Format::eR32G32Sfloat, offsetof(Vertex, pos)},
-			{1, 0, vk::Format::eR32G32Sfloat, offsetof(Vertex, color)}
+			{1, 0, vk::Format::eR32G32Sfloat, offsetof(Vertex, color)},
+			{2, 0, vk::Format::eR32G32Sfloat, offsetof(Vertex, texCoord)}
 		}};
 		return attributeDescriptions;
 	}
@@ -100,11 +102,21 @@ private:
 	void createLogicalDevice();
 	void createSwapChain();
 	void createImageViews();
+	vk::ImageView createImageView(vk::Image, vk::Format);
 	void createRenderPass();
 	void createGraphicsPipeline();
 	void createDescriptorSetLayout();
 	void createFramebuffers();
 	void createCommandPool();
+	void createTextureImage();
+	void createTextureImageView();
+	void createTextureSampler();
+	void createImage(
+		std::uint32_t, std::uint32_t, vk::Format,
+		vk::ImageTiling, vk::ImageUsageFlags,
+		vk::MemoryPropertyFlagBits,
+		vk::Image&, vk::DeviceMemory&);
+	void transitionImageLayout(vk::Image, vk::Format, vk::ImageLayout, vk::ImageLayout);
 	void createCommandBuffers();
 	void recordCommandBuffer(vk::CommandBuffer, std::uint32_t);
 	void createSyncObjects();
@@ -117,6 +129,7 @@ private:
 	void createDescriptorPool();
 	void createDescriptorSet();
 	void copyBuffer(vk::Buffer, vk::Buffer, vk::DeviceSize);
+	void copyBufferToImage(vk::Buffer, vk::Image, std::uint32_t, std::uint32_t);
 	std::vector<char> readFile(const std::string&);
 	vk::ShaderModule createShaderModule(const std::vector<char>&);
 
@@ -125,6 +138,8 @@ private:
 
 	void drawFrame();
 	void updateUniformBuffer(std::uint32_t);
+	vk::CommandBuffer beginOneTimeCommands();
+	void endOneTimeCommands(vk::CommandBuffer);
 
 	QueueFamilyIndices findQueueFamilies(vk::PhysicalDevice);
 	vk::SurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormatKHR>&);
@@ -192,4 +207,9 @@ private:
 
 	vk::DescriptorPool m_descriptorPool;
 	std::vector<vk::DescriptorSet> m_descriptorSets;
+
+	vk::Image m_textureImage;
+	vk::DeviceMemory m_textureImageMemory;
+	vk::ImageView m_textureImageView;
+	vk::Sampler m_textureSampler;
 };
