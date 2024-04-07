@@ -12,3 +12,5 @@ x64/
 # Project related artifacts
 *.spv
 *.jpg
+*.obj
+*.png

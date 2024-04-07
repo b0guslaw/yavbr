@@ -5,6 +5,9 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image/stb_image.h>
 
+#define TINYOBJLOADER_IMPLEMENTATION
+#include <tiny_obj_loader.h>
+
 #include <iostream>
 #include <vector>
 #include <set>
@@ -13,29 +16,13 @@
 #include <array>
 #include <fstream>
 #include <chrono>
+#include <unordered_map>
 
 std::vector<const char*> requestedLayers = { "VK_LAYER_KHRONOS_validation" };
 std::vector<const char*> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
 
 void Application::run()
 {
-	m_vertices = {
-		{{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-		{{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-		{{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-		{{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
-
-		{{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-		{{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-		{{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-		{{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}
-	};
-
-	m_indices = {
-		0, 1, 2, 2, 3, 0,
-		4, 5, 6, 6, 7, 4
-	};
-
 	initWindow();
 	initVulkan();
 	mainLoop();
@@ -69,6 +56,7 @@ void Application::initVulkan()
 	createTextureImage();
 	createTextureImageView();
 	createTextureSampler();
+	loadModel();
 	createVertexBuffer();
 	createIndexBuffer();
 	createUniformBuffers();
@@ -503,7 +491,7 @@ void Application::createDepthResources()
 void Application::createTextureImage()
 {
 	int textureWidth, textureHeight, textureChannels;
-	auto pixels = stbi_load("textures/texture.jpg",
+	auto pixels = stbi_load(TEXTURE_PATH.c_str(),
 		&textureWidth, &textureHeight, &textureChannels,
 		STBI_rgb_alpha
 	);
@@ -691,7 +679,7 @@ void Application::recordCommandBuffer(vk::CommandBuffer commandBuffer, std::uint
 	vk::DeviceSize offsets[] = { 0 };
 
 	commandBuffer.bindVertexBuffers(0, vertexBuffers, offsets);
-	commandBuffer.bindIndexBuffer(m_indexBuffer, 0, vk::IndexType::eUint16);
+	commandBuffer.bindIndexBuffer(m_indexBuffer, 0, vk::IndexType::eUint32);
 	commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, m_pipelineLayout, 0, 1, &m_descriptorSets[m_currentFrame], 0, nullptr);
 
 	vk::Viewport viewport(
@@ -779,6 +767,46 @@ void Application::createBuffer(vk::DeviceSize size,
 			vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent));
 	bufferMemory = m_device.allocateMemory(allocateInfo);
 	m_device.bindBufferMemory(buffer, bufferMemory, 0);
+}
+
+void Application::loadModel()
+{
+	tinyobj::attrib_t attrib;
+	std::vector<tinyobj::shape_t> shapes;
+	std::vector<tinyobj::material_t> materials;
+	std::string error;
+	bool result = tinyobj::LoadObj(&attrib, &shapes, &materials, &error, MODEL_PATH.c_str());
+
+	if (!result) {
+		throw std::runtime_error("Unable to load model\n");
+	}
+
+	std::unordered_map<Vertex, uint32_t> vertices_map{};
+
+	for (const auto& shape : shapes) {
+		for (const auto& index : shape.mesh.indices) {
+			Vertex vert;
+
+			vert.pos = {
+				attrib.vertices[3 * index.vertex_index + 0],
+				attrib.vertices[3 * index.vertex_index + 1],
+				attrib.vertices[3 * index.vertex_index + 2],
+			};
+
+			vert.texCoord = {
+				attrib.texcoords[2 * index.texcoord_index + 0],
+				1.0f - attrib.texcoords[2 * index.texcoord_index + 1],
+			};
+
+			vert.color = { 1.0f, 1.0f, 1.0f };
+
+			if (!vertices_map.contains(vert)) {
+				vertices_map[vert] = static_cast<std::uint32_t>(m_vertices.size());
+				m_vertices.push_back(vert);
+			}
+			m_indices.push_back(vertices_map[vert]);
+		}
+	}
 }
 
 void Application::createVertexBuffer()

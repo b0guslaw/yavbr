@@ -16,7 +16,9 @@
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/glm.hpp>
+#include <glm/gtx/hash.hpp>
 
 #include <optional>
 #include <array>
@@ -45,7 +47,21 @@ struct Vertex {
 		}};
 		return attributeDescriptions;
 	}
+
+	bool operator==(const Vertex& rhs) const {
+		return pos == rhs.pos && color == rhs.color && texCoord == rhs.texCoord;
+	}
 };
+
+namespace std {
+	template<> struct hash<Vertex> {
+		size_t operator()(Vertex const& vertex) const {
+			return ((hash<glm::vec3>()(vertex.pos) ^
+				(hash<glm::vec3>()(vertex.color) << 1)) >> 1) ^
+				(hash<glm::vec2>()(vertex.texCoord) << 1);
+		}
+	};
+}
 
 struct UniformBufferObject {
 	glm::mat4 model;
@@ -85,6 +101,10 @@ class Application {
 
 	const std::uint32_t WIDTH{ 800 };
 	const std::uint32_t HEIGHT{ 600 };
+
+	const std::string MODEL_PATH = "models/viking_room.obj";
+	const std::string TEXTURE_PATH = "textures/viking_room.png";
+
 	const std::uint32_t MAX_FRAMES_IN_FLIGHT{ 2 };
 
 	const std::string application_name{ "Vulkan Application" };
@@ -125,6 +145,7 @@ private:
 	void recreateSwapChain();
 	void cleanupSwapChain();
 	void createBuffer(vk::DeviceSize, vk::BufferUsageFlags, vk::MemoryPropertyFlags, vk::Buffer&, vk::DeviceMemory&);
+	void loadModel();
 	void createVertexBuffer();
 	void createIndexBuffer();
 	void createUniformBuffers();
@@ -204,7 +225,7 @@ private:
 
 	vk::Buffer m_indexBuffer;
 	vk::DeviceMemory m_indexBufferMemory;
-	std::vector<std::uint16_t> m_indices;
+	std::vector<std::uint32_t> m_indices;
 	
 	std::vector<vk::Buffer> m_uniformBuffers;
 	std::vector<vk::DeviceMemory> m_uniformBuffersMemory;
