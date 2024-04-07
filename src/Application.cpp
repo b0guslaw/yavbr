@@ -767,16 +767,16 @@ void Application::createDescriptorPool()
 	std::array<vk::DescriptorPoolSize, 2> poolSizes{};
 	poolSizes[0]
 		.setType(vk::DescriptorType::eUniformBuffer)
-		.setDescriptorCount(static_cast<std::uint32_t>(MAX_FRAMES_IN_FLIGHT));
+		.setDescriptorCount(MAX_FRAMES_IN_FLIGHT);
 	poolSizes[1]
 		.setType(vk::DescriptorType::eUniformBuffer)
-		.setDescriptorCount(static_cast<std::uint32_t>(MAX_FRAMES_IN_FLIGHT));
+		.setDescriptorCount(MAX_FRAMES_IN_FLIGHT);
 
 	vk::DescriptorPoolCreateInfo descriptorPoolCreateInfo;
 	descriptorPoolCreateInfo
-		.setPoolSizeCount(static_cast<std::uint32_t>(MAX_FRAMES_IN_FLIGHT))
+		.setPoolSizeCount(MAX_FRAMES_IN_FLIGHT)
 		.setPPoolSizes(poolSizes.data())
-		.setMaxSets(static_cast<std::uint32_t>(MAX_FRAMES_IN_FLIGHT));
+		.setMaxSets(MAX_FRAMES_IN_FLIGHT);
 
 	m_descriptorPool = m_device.createDescriptorPool(descriptorPoolCreateInfo);
 }
