@@ -15,13 +15,14 @@
 #endif
 
 #define GLM_FORCE_RADIANS
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 
 #include <optional>
 #include <array>
 
 struct Vertex {
-	glm::vec2 pos;
+	glm::vec3 pos;
 	glm::vec3 color;
 	glm::vec2 texCoord;
 
@@ -38,8 +39,8 @@ struct Vertex {
 	static std::array<vk::VertexInputAttributeDescription, 3> getAttributeDescription() {
 		std::array<vk::VertexInputAttributeDescription, 3> attributeDescriptions
 		{{
-			{0, 0, vk::Format::eR32G32Sfloat, offsetof(Vertex, pos)},
-			{1, 0, vk::Format::eR32G32Sfloat, offsetof(Vertex, color)},
+			{0, 0, vk::Format::eR32G32B32Sfloat, offsetof(Vertex, pos)},
+			{1, 0, vk::Format::eR32G32B32Sfloat, offsetof(Vertex, color)},
 			{2, 0, vk::Format::eR32G32Sfloat, offsetof(Vertex, texCoord)}
 		}};
 		return attributeDescriptions;
@@ -102,12 +103,13 @@ private:
 	void createLogicalDevice();
 	void createSwapChain();
 	void createImageViews();
-	vk::ImageView createImageView(vk::Image, vk::Format);
+	vk::ImageView createImageView(vk::Image, vk::Format, vk::ImageAspectFlags);
 	void createRenderPass();
 	void createGraphicsPipeline();
 	void createDescriptorSetLayout();
 	void createFramebuffers();
 	void createCommandPool();
+	void createDepthResources();
 	void createTextureImage();
 	void createTextureImageView();
 	void createTextureSampler();
@@ -146,6 +148,9 @@ private:
 	vk::PresentModeKHR chooseSwapPresentMode(const std::vector<vk::PresentModeKHR>&);
 	vk::Extent2D chooseSwapExtent(const vk::SurfaceCapabilitiesKHR&);
 	SwapChainSupportDetails querySwapChainSupport(vk::PhysicalDevice);
+	vk::Format findSupportedFormat(const std::vector<vk::Format>&, vk::ImageTiling, vk::FormatFeatureFlags);
+	vk::Format findDepthFormat();
+	bool hasStencilComponent(vk::Format);
 
 	std::uint32_t findMemoryType(std::uint32_t, vk::MemoryPropertyFlags);
 
@@ -212,4 +217,8 @@ private:
 	vk::DeviceMemory m_textureImageMemory;
 	vk::ImageView m_textureImageView;
 	vk::Sampler m_textureSampler;
+
+	vk::Image m_depthImage;
+	vk::DeviceMemory m_depthImageMemory;
+	vk::ImageView m_depthImageView;
 };

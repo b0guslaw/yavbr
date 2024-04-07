@@ -20,14 +20,20 @@ std::vector<const char*> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
 void Application::run()
 {
 	m_vertices = {
-		{{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-		{{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
-		{{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
-		{{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}}
+		{{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+		{{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+		{{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+		{{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
+
+		{{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+		{{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+		{{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+		{{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}
 	};
 
 	m_indices = {
-		0, 1, 2, 2, 3, 0
+		0, 1, 2, 2, 3, 0,
+		4, 5, 6, 6, 7, 4
 	};
 
 	initWindow();
@@ -57,8 +63,9 @@ void Application::initVulkan()
 	createRenderPass();
 	createDescriptorSetLayout();
 	createGraphicsPipeline();
-	createFramebuffers();
 	createCommandPool();
+	createDepthResources();
+	createFramebuffers();
 	createTextureImage();
 	createTextureImageView();
 	createTextureSampler();
@@ -221,18 +228,18 @@ void Application::createImageViews()
 {
 	m_swapchainImageViews.resize(m_swapchainImages.size());
 	for (std::size_t i{ 0 }; i < m_swapchainImages.size(); i++) {
-		m_swapchainImageViews[i] = createImageView(m_swapchainImages[i], m_swapchainImageFormat);
+		m_swapchainImageViews[i] = createImageView(m_swapchainImages[i], m_swapchainImageFormat, vk::ImageAspectFlagBits::eColor);
 	}
 }
 
-vk::ImageView Application::createImageView(vk::Image image, vk::Format format)
+vk::ImageView Application::createImageView(vk::Image image, vk::Format format, vk::ImageAspectFlags aspectFlags)
 {
 	vk::ImageViewCreateInfo createInfo;
 	createInfo
 		.setImage(image)
 		.setFormat(format)
 		.setViewType(vk::ImageViewType::e2D)
-		.setSubresourceRange({ vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 });
+		.setSubresourceRange({aspectFlags, 0, 1, 0, 1});
 	return m_device.createImageView(createInfo);
 }
 
@@ -249,24 +256,50 @@ void Application::createRenderPass()
 		vk::ImageLayout::ePresentSrcKHR);
 
 	vk::AttachmentReference colorAttachmentRef(0, vk::ImageLayout::eColorAttachmentOptimal);
-	vk::SubpassDescription subpass;
-	subpass.colorAttachmentCount = 1;
-	subpass.pColorAttachments = &colorAttachmentRef;
 
-	vk::RenderPassCreateInfo renderPassCreateInfo({},
-		1, &colorAttachment,
-		1, &subpass);
-	m_renderPass = m_device.createRenderPass(renderPassCreateInfo);
+	vk::AttachmentDescription depthAttachment;
+	depthAttachment
+		.setFormat(findDepthFormat())
+		.setSamples(vk::SampleCountFlagBits::e1)
+		.setLoadOp(vk::AttachmentLoadOp::eClear)
+		.setStoreOp(vk::AttachmentStoreOp::eDontCare)
+		.setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
+		.setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
+		.setInitialLayout(vk::ImageLayout::eUndefined)
+		.setFinalLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
+
+	vk::AttachmentReference depthAttachmentRef;
+	depthAttachmentRef
+		.setAttachment(1)
+		.setLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
+
+	std::array<vk::AttachmentDescription, 2> attachments = {
+		colorAttachment, depthAttachment
+	};
+
+	vk::SubpassDescription subpass;
+	subpass
+		.setColorAttachmentCount(1)
+		.setPColorAttachments(&colorAttachmentRef)
+		.setPDepthStencilAttachment(&depthAttachmentRef);
 
 	vk::SubpassDependency dependency;
-	dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-	dependency.dstSubpass = 0;
-	dependency.srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
-	dependency.dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
-	dependency.dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
+	dependency
+		.setSrcSubpass(VK_SUBPASS_EXTERNAL)
+		.setDstSubpass(0)
+		.setSrcStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests)
+		.setDstStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests)
+		.setDstAccessMask(vk::AccessFlagBits::eColorAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentWrite);
 
-	renderPassCreateInfo.dependencyCount = 1;
-	renderPassCreateInfo.pDependencies = &dependency;
+	vk::RenderPassCreateInfo renderPassCreateInfo;
+	renderPassCreateInfo
+		.setAttachmentCount(static_cast<std::uint32_t>(attachments.size()))
+		.setPAttachments(attachments.data())
+		.setSubpassCount(1)
+		.setSubpasses(subpass)
+		.setDependencyCount(2)
+		.setDependencies(dependency);
+	m_renderPass = m_device.createRenderPass(renderPassCreateInfo);
 }
 
 void Application::createGraphicsPipeline()
@@ -318,6 +351,16 @@ void Application::createGraphicsPipeline()
 
 	vk::PipelineMultisampleStateCreateInfo multiSamplingCreateInfo;
 
+	vk::PipelineDepthStencilStateCreateInfo depthStencilCreateInfo;
+	depthStencilCreateInfo
+		.setDepthTestEnable(vk::True)
+		.setDepthWriteEnable(vk::True)
+		.setDepthCompareOp(vk::CompareOp::eLess)
+		.setDepthBoundsTestEnable(vk::False)
+		.setMinDepthBounds(0.0f)
+		.setMaxDepthBounds(1.0f)
+		.setStencilTestEnable(vk::False);
+
 	vk::PipelineColorBlendAttachmentState colorBlendAttachment(
 		vk::False,
 		vk::BlendFactor::eOne,
@@ -351,19 +394,21 @@ void Application::createGraphicsPipeline()
 	}
 
 	vk::GraphicsPipelineCreateInfo graphicsPipelineCreateInfo;
-	graphicsPipelineCreateInfo.stageCount = 2;
-	graphicsPipelineCreateInfo.pStages = shaderStages;
-	graphicsPipelineCreateInfo.pVertexInputState = &vertexInputCreateInfo;
-	graphicsPipelineCreateInfo.pInputAssemblyState = &inputAssemblyCreateInfo;
-	graphicsPipelineCreateInfo.pViewportState = &viewPortStateCreateInfo;
-	graphicsPipelineCreateInfo.pRasterizationState = &rasterizerCreateInfo;
-	graphicsPipelineCreateInfo.pMultisampleState = &multiSamplingCreateInfo;
-	graphicsPipelineCreateInfo.pColorBlendState = &colorBlendCreateInfo;
-	graphicsPipelineCreateInfo.pDynamicState = &dynamicStateCreateInfo;
-	graphicsPipelineCreateInfo.layout = m_pipelineLayout;
-	graphicsPipelineCreateInfo.renderPass = m_renderPass;
-	graphicsPipelineCreateInfo.subpass = 0;
-	graphicsPipelineCreateInfo.basePipelineHandle = nullptr;
+	graphicsPipelineCreateInfo
+		.setStageCount(2)
+		.setPStages(shaderStages)
+		.setPVertexInputState(&vertexInputCreateInfo)
+		.setPInputAssemblyState(&inputAssemblyCreateInfo)
+		.setPViewportState(&viewPortStateCreateInfo)
+		.setPRasterizationState(&rasterizerCreateInfo)
+		.setPMultisampleState(&multiSamplingCreateInfo)
+		.setPColorBlendState(&colorBlendCreateInfo)
+		.setPDynamicState(& dynamicStateCreateInfo)
+		.setLayout(m_pipelineLayout)
+		.setRenderPass(m_renderPass)
+		.setSubpass(0)
+		.setBasePipelineHandle(nullptr)
+		.setPDepthStencilState(&depthStencilCreateInfo);
 
 	try {
 		m_graphicsPipeline = m_device.createGraphicsPipeline(nullptr, graphicsPipelineCreateInfo).value;
@@ -410,17 +455,19 @@ void Application::createFramebuffers()
 	m_swapChainFramebuffers.resize(m_swapchainImageViews.size());
 
 	for (std::size_t i{ 0 }; i < m_swapchainImageViews.size(); i++) {
-		vk::ImageView attachments[] = {
-			m_swapchainImageViews[i]
+		std::array<vk::ImageView, 2> attachments = {
+			m_swapchainImageViews[i],
+			m_depthImageView
 		};
 
-		vk::FramebufferCreateInfo frameBufferCreateInfo({},
-			m_renderPass,
-			1,
-			attachments,
-			m_swapchainExtent.width,
-			m_swapchainExtent.height,
-			1);
+		vk::FramebufferCreateInfo frameBufferCreateInfo;
+		frameBufferCreateInfo
+			.setRenderPass(m_renderPass)
+			.setAttachmentCount(static_cast<std::uint32_t>(attachments.size()))
+			.setAttachments(attachments)
+			.setWidth(m_swapchainExtent.width)
+			.setHeight(m_swapchainExtent.height)
+			.setLayers(1);
 		m_swapChainFramebuffers[i] = m_device.createFramebuffer(frameBufferCreateInfo);
 	}
 }
@@ -435,6 +482,22 @@ void Application::createCommandPool()
 	);
 
 	m_commandPool = m_device.createCommandPool(commandPoolCreateInfo);
+}
+
+void Application::createDepthResources()
+{
+	auto format = findDepthFormat();
+	createImage(
+		m_swapchainExtent.width,
+		m_swapchainExtent.height,
+		format,
+		vk::ImageTiling::eOptimal,
+		vk::ImageUsageFlagBits::eDepthStencilAttachment,
+		vk::MemoryPropertyFlagBits::eDeviceLocal,
+		m_depthImage,
+		m_depthImageMemory);
+	m_depthImageView = createImageView(m_depthImage, format, vk::ImageAspectFlagBits::eDepth);
+	transitionImageLayout(m_depthImage, format, vk::ImageLayout::eUndefined, vk::ImageLayout::eDepthStencilAttachmentOptimal);
 }
 
 void Application::createTextureImage()
@@ -481,7 +544,7 @@ void Application::createTextureImage()
 
 void Application::createTextureImageView()
 {
-	m_textureImageView = createImageView(m_textureImage, vk::Format::eR8G8B8A8Srgb);
+	m_textureImageView = createImageView(m_textureImage, vk::Format::eR8G8B8A8Srgb, vk::ImageAspectFlagBits::eColor);
 }
 
 void Application::createTextureSampler()
@@ -553,6 +616,15 @@ void Application::transitionImageLayout(vk::Image image, vk::Format format, vk::
 
 	vk::PipelineStageFlags sourceStage, destinationStage;
 
+	if (newLayout == vk::ImageLayout::eDepthStencilAttachmentOptimal) {
+		barrier.subresourceRange.setAspectMask(vk::ImageAspectFlagBits::eDepth);
+		if (hasStencilComponent(format)) {
+			barrier.subresourceRange.aspectMask |= vk::ImageAspectFlagBits::eDepth;
+		}
+	} else {
+		barrier.subresourceRange.setAspectMask(vk::ImageAspectFlagBits::eColor);
+	}
+
 	if (oldLayout == vk::ImageLayout::eUndefined && newLayout == vk::ImageLayout::eTransferDstOptimal) {
 		barrier
 			.setSrcAccessMask(vk::AccessFlagBits::eNone)
@@ -566,6 +638,12 @@ void Application::transitionImageLayout(vk::Image image, vk::Format format, vk::
 			.setDstAccessMask(vk::AccessFlagBits::eShaderRead);
 		sourceStage = vk::PipelineStageFlagBits::eTransfer;
 		destinationStage = vk::PipelineStageFlagBits::eFragmentShader;
+	} else if (oldLayout == vk::ImageLayout::eUndefined && newLayout == vk::ImageLayout::eDepthStencilAttachmentOptimal) {
+		barrier
+			.setSrcAccessMask(vk::AccessFlagBits::eNone)
+			.setDstAccessMask(vk::AccessFlagBits::eDepthStencilAttachmentRead | vk::AccessFlagBits::eDepthStencilAttachmentWrite);
+		sourceStage = vk::PipelineStageFlagBits::eTopOfPipe;
+		destinationStage = vk::PipelineStageFlagBits::eEarlyFragmentTests;
 	} else {
 		throw std::runtime_error("Unsupported layer transition\n");
 	}
@@ -595,12 +673,16 @@ void Application::recordCommandBuffer(vk::CommandBuffer commandBuffer, std::uint
 	vk::CommandBufferBeginInfo beginInfo;
 	commandBuffer.begin(beginInfo);
 
-	vk::ClearValue clearValue = vk::ClearValue{ vk::ClearColorValue{ std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f} } };
-	vk::RenderPassBeginInfo renderPassBeginInfo(
-		m_renderPass,
-		m_swapChainFramebuffers[imageIndex],
-		vk::Rect2D(vk::Offset2D(), m_swapchainExtent),
-		1, &clearValue);
+	std::array<vk::ClearValue, 2> clearValues{};
+	clearValues[0].setColor({std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f}});
+	clearValues[1].setDepthStencil({ 1.0f, 0 });
+	vk::RenderPassBeginInfo renderPassBeginInfo;
+	renderPassBeginInfo
+		.setRenderPass(m_renderPass)
+		.setFramebuffer(m_swapChainFramebuffers[imageIndex])
+		.setRenderArea({ vk::Offset2D(), m_swapchainExtent })
+		.setClearValueCount(static_cast<std::uint32_t>(clearValues.size()))
+		.setClearValues(clearValues);
 
 	commandBuffer.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
 	commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, m_graphicsPipeline);
@@ -652,13 +734,19 @@ void Application::recreateSwapChain()
 
 	m_device.waitIdle();
 	cleanupSwapChain();
+
 	createSwapChain();
 	createImageViews();
+	createDepthResources();
 	createFramebuffers();
 }
 
 void Application::cleanupSwapChain()
 {
+	m_device.destroyImageView(m_depthImageView);
+	m_device.destroyImage(m_depthImage);
+	m_device.freeMemory(m_depthImageMemory);
+
 	for (auto framebuffer : m_swapChainFramebuffers) {
 		m_device.destroy(framebuffer);
 	}
@@ -1126,6 +1214,38 @@ SwapChainSupportDetails Application::querySwapChainSupport(vk::PhysicalDevice de
 	details.presentModes = device.getSurfacePresentModesKHR(m_surface);
 	details.formats = device.getSurfaceFormatsKHR(m_surface);
 	return details;
+}
+
+vk::Format Application::findSupportedFormat(
+	const std::vector<vk::Format>& candidates,
+	vk::ImageTiling tiling,
+	vk::FormatFeatureFlags featureFlags)
+{
+	for (auto format : candidates) {
+		auto properties = m_physicalDevice.getFormatProperties(format);
+		if (tiling == vk::ImageTiling::eLinear && (properties.linearTilingFeatures & featureFlags) == featureFlags) {
+			return format;
+		}
+		else if (tiling == vk::ImageTiling::eOptimal && (properties.optimalTilingFeatures & featureFlags) == featureFlags) {
+			return format;
+		}
+	}
+
+	throw std::runtime_error("Failed to find support format\n");
+}
+
+vk::Format Application::findDepthFormat()
+{
+	return findSupportedFormat(
+		{vk::Format::eD32Sfloat, vk::Format::eD32SfloatS8Uint, vk::Format::eD24UnormS8Uint},
+		vk::ImageTiling::eOptimal,
+		vk::FormatFeatureFlagBits::eDepthStencilAttachment
+	);
+}
+
+bool Application::hasStencilComponent(vk::Format format)
+{
+	return format == vk::Format::eD32SfloatS8Uint || format == vk::Format::eD24UnormS8Uint;
 }
 
 std::uint32_t Application::findMemoryType(std::uint32_t filter, vk::MemoryPropertyFlags properties)
