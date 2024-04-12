@@ -129,6 +129,7 @@ private:
 	void createDescriptorSetLayout();
 	void createFramebuffers();
 	void createCommandPool();
+	void createColorResources();
 	void createDepthResources();
 	void createTextureImage();
 	void createTextureImageView();
@@ -138,6 +139,7 @@ private:
 		vk::ImageTiling, vk::ImageUsageFlags,
 		vk::MemoryPropertyFlagBits,
 		vk::Image&, vk::DeviceMemory&,
+		vk::SampleCountFlagBits numSamples = vk::SampleCountFlagBits::e1,
 		std::uint32_t mipLevels = 1);
 	void transitionImageLayout(vk::Image, vk::Format, vk::ImageLayout, vk::ImageLayout, std::uint32_t mipLevels = 1);
 	void createCommandBuffers();
@@ -177,6 +179,8 @@ private:
 	std::uint32_t findMemoryType(std::uint32_t, vk::MemoryPropertyFlags);
 
 	void generateMipmaps(vk::Image, vk::Format, std::int32_t, std::int32_t, std::uint32_t);
+
+	vk::SampleCountFlagBits getMaxUsableSampleCount();
 
 	void setupDebugCallback();
 	static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
@@ -246,4 +250,9 @@ private:
 	vk::Image m_depthImage;
 	vk::DeviceMemory m_depthImageMemory;
 	vk::ImageView m_depthImageView;
+
+	vk::SampleCountFlagBits m_msaaSamples{vk::SampleCountFlagBits::e1};
+	vk::Image m_colorImage;
+	vk::DeviceMemory m_colorImageMemory;
+	vk::ImageView m_colorImageView;
 };
