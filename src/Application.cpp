@@ -3,7 +3,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #define STB_IMAGE_IMPLEMENTATION
-#include <stb_image/stb_image.h>
+#include <stb_image.h>
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
@@ -774,8 +774,8 @@ void Application::loadModel()
 	tinyobj::attrib_t attrib;
 	std::vector<tinyobj::shape_t> shapes;
 	std::vector<tinyobj::material_t> materials;
-	std::string error;
-	bool result = tinyobj::LoadObj(&attrib, &shapes, &materials, &error, MODEL_PATH.c_str());
+	std::string warn, error;
+	bool result = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &error, MODEL_PATH.c_str());
 
 	if (!result) {
 		throw std::runtime_error("Unable to load model\n");

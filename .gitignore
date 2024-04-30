@@ -2,12 +2,17 @@
 build*/
 .cache/
 x64/
+cmake-build*/
+conandata.yml
+conan_provider.cmake
+CMakeUserPresets.json
 
-# Development related items
+# IDE Files
 .vscode/
 .vs/
 *.vcxproj*
 *.sln
+.idea/
 
 # Project related artifacts
 *.spv
