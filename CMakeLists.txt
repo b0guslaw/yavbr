@@ -24,6 +24,8 @@ add_executable(yavbr
         src/main.cpp
         src/Application.cpp)
 
+target_include_directories(yavbr PRIVATE ${CMAKE_SOURCE_DIR}/external)
+
 target_link_libraries(yavbr
         PRIVATE Vulkan::Vulkan
         PRIVATE glfw

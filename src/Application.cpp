@@ -1,9 +1,10 @@
 #include "Application.h"
 
+#include <cstdint>
 #include <glm/gtc/matrix_transform.hpp>
 
 #define STB_IMAGE_IMPLEMENTATION
-#include <stb_image.h>
+#include "stb_image.h"
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
@@ -683,7 +684,7 @@ void Application::transitionImageLayout(vk::Image image, vk::Format format, vk::
 	}
 
 	commandBuffer.pipelineBarrier(
-		sourceStage, 
+		sourceStage,
 		destinationStage,
 		vk::DependencyFlagBits(0U),
 		0, nullptr,
@@ -867,7 +868,7 @@ void Application::createVertexBuffer()
 	vk::Buffer stagingBuffer;
 	vk::DeviceMemory stagingBufferMemory;
 
-	createBuffer(bufferSize, 
+	createBuffer(bufferSize,
 		vk::BufferUsageFlagBits::eTransferSrc,
 		vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
 		stagingBuffer,
@@ -936,12 +937,12 @@ void Application::createDescriptorPool()
 		.setType(vk::DescriptorType::eUniformBuffer)
 		.setDescriptorCount(MAX_FRAMES_IN_FLIGHT);
 	poolSizes[1]
-		.setType(vk::DescriptorType::eUniformBuffer)
+		.setType(vk::DescriptorType::eCombinedImageSampler)
 		.setDescriptorCount(MAX_FRAMES_IN_FLIGHT);
 
 	vk::DescriptorPoolCreateInfo descriptorPoolCreateInfo;
 	descriptorPoolCreateInfo
-		.setPoolSizeCount(MAX_FRAMES_IN_FLIGHT)
+		.setPoolSizeCount(static_cast<std::uint32_t>(poolSizes.size()))
 		.setPPoolSizes(poolSizes.data())
 		.setMaxSets(MAX_FRAMES_IN_FLIGHT);
 
@@ -1052,7 +1053,7 @@ bool Application::isSuitableDevice(vk::PhysicalDevice device)
 	}
 
 	return deviceFeatures.geometryShader &&
-		deviceProperties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu &&
+		// deviceProperties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu &&
 		swapChainAdequate;
 }
 
@@ -1388,7 +1389,7 @@ void Application::generateMipmaps(vk::Image image, vk::Format imageFormat, std::
 	auto mipWidth = width;
 	auto mipHeight = height;
 	for (std::uint32_t i{1}; i < mipLevels; i++) {
-		
+
 		barrier.subresourceRange.baseMipLevel = i - 1;
 		barrier
 			.setOldLayout(vk::ImageLayout::eTransferDstOptimal)
@@ -1413,7 +1414,7 @@ void Application::generateMipmaps(vk::Image image, vk::Format imageFormat, std::
 			.setDstSubresource({ vk::ImageAspectFlagBits::eColor, i, 0, 1 });
 
 		commandBuffer.blitImage(image, vk::ImageLayout::eTransferSrcOptimal, image, vk::ImageLayout::eTransferDstOptimal, blit, vk::Filter::eLinear);
-	
+
 		barrier
 			.setOldLayout(vk::ImageLayout::eTransferSrcOptimal)
 			.setNewLayout(vk::ImageLayout::eShaderReadOnlyOptimal)
