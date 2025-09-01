@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <glm/gtc/matrix_transform.hpp>
+#include <vulkan/vulkan_handles.hpp>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -21,6 +22,19 @@
 
 std::vector<const char*> requestedLayers = { "VK_LAYER_KHRONOS_validation" };
 std::vector<const char*> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+
+VKAPI_ATTR VkBool32 VKAPI_CALL Application::debugCallback(
+    vk::DebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+    vk::DebugUtilsMessageTypeFlagsEXT messageType,
+    const vk::DebugUtilsMessengerCallbackDataEXT* pCallbackData,
+    void* pUserData
+)
+{
+    std::cerr << "[Validation Layer] " << pCallbackData->pMessage << std::endl;
+
+    return VK_FALSE;
+}
+
 
 void Application::run()
 {
@@ -823,15 +837,18 @@ void Application::createBuffer(vk::DeviceSize size,
 
 void Application::loadModel()
 {
-	tinyobj::attrib_t attrib;
-	std::vector<tinyobj::shape_t> shapes;
-	std::vector<tinyobj::material_t> materials;
-	std::string warn, error;
-	bool result = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &error, MODEL_PATH.c_str());
+	tinyobj::ObjReader reader;
+    tinyobj::ObjReaderConfig reader_config;
+    reader_config.mtl_search_path = "models/";
+	if (!reader.ParseFromFile(MODEL_PATH, reader_config)) {
+    if (!reader.Error().empty()) {
+        std::cerr << "TinyObjReader: " << reader.Error();
+    }
+    }
 
-	if (!result) {
-		throw std::runtime_error("Unable to load model\n");
-	}
+    auto& attrib = reader.GetAttrib();
+    auto& shapes = reader.GetShapes();
+    auto& materials = reader.GetMaterials();
 
 	std::unordered_map<Vertex, uint32_t> vertices_map{};
 
@@ -1344,28 +1361,31 @@ std::uint32_t Application::findMemoryType(std::uint32_t filter, vk::MemoryProper
 
 void Application::setupDebugCallback()
 {
-	if (!m_enableValidationLayers) return;
+    if (!m_enableValidationLayers) return;
 
-	auto createInfo = vk::DebugUtilsMessengerCreateInfoEXT(
-		vk::DebugUtilsMessengerCreateFlagsEXT(),
-		vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose |
-		vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
-		vk::DebugUtilsMessageSeverityFlagBitsEXT::eError,
-		vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
-		vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation |
-		vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance,
-		debugCallback,
-		nullptr
-	);
+    vk::DebugUtilsMessengerCreateInfoEXT createInfo{};
+    createInfo.messageSeverity =
+        vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose |
+        vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
+        vk::DebugUtilsMessageSeverityFlagBitsEXT::eError;
+    createInfo.messageType =
+        vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
+        vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation |
+        vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance;
+    createInfo.pfnUserCallback = debugCallback;
+    createInfo.pUserData = nullptr;
 
-	if (CreateDebugUtilsMessengerEXT(m_instance,
-		reinterpret_cast<const VkDebugUtilsMessengerCreateInfoEXT*>(&createInfo),
-		nullptr,
-		&callback) != VK_SUCCESS)
-	{
-		throw std::runtime_error("failed to set up debug callback!");
-	}
+    if (CreateDebugUtilsMessengerEXT(
+            m_instance,
+            reinterpret_cast<const VkDebugUtilsMessengerCreateInfoEXT*>(&createInfo),
+            nullptr,
+            &callback) != VK_SUCCESS)
+    {
+        throw std::runtime_error("failed to set up debug callback!");
+    }
 }
+
+
 
 void Application::generateMipmaps(vk::Image image, vk::Format imageFormat, std::int32_t width, std::int32_t height, std::uint32_t mipLevels)
 {
@@ -1451,16 +1471,6 @@ void Application::generateMipmaps(vk::Image image, vk::Format imageFormat, std::
 	);
 
 	endOneTimeCommands(commandBuffer);
-}
-
-VKAPI_ATTR VkBool32 VKAPI_CALL Application::debugCallback(
-	VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-	VkDebugUtilsMessageTypeFlagsEXT messageType,
-	const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-	void* pUserData)
-{
-	std::cout << "validation layer: " << pCallbackData->pMessage << std::endl;
-	return VK_FALSE;
 }
 
 vk::SampleCountFlagBits Application::getMaxUsableSampleCount()

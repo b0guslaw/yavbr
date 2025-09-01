@@ -68,7 +68,10 @@ struct UniformBufferObject {
 	glm::mat4 proj;
 };
 
-inline VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pCallback) {
+inline VkResult VKAPI_CALL CreateDebugUtilsMessengerEXT(VkInstance instance,
+                                                        const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
+                                                        const VkAllocationCallbacks* pAllocator,
+                                                        VkDebugUtilsMessengerEXT* pCallback) {
 	auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
 	if (func != nullptr) {
 		return func(instance, pCreateInfo, pAllocator, pCallback);
@@ -183,11 +186,10 @@ private:
 
 	void setupDebugCallback();
 	static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
-		VkDebugUtilsMessageSeverityFlagBitsEXT,
-		VkDebugUtilsMessageTypeFlagsEXT,
-		const VkDebugUtilsMessengerCallbackDataEXT*,
-		void*
-	);
+        vk::DebugUtilsMessageSeverityFlagBitsEXT,
+        vk::DebugUtilsMessageTypeFlagsEXT,
+        const vk::DebugUtilsMessengerCallbackDataEXT*,
+        void*);
 
 	static void framebufferResizedCallback(GLFWwindow* window, int width, int height) {
 		auto app = reinterpret_cast<Application*>(glfwGetWindowUserPointer(window));
@@ -232,7 +234,7 @@ private:
 	vk::Buffer m_indexBuffer;
 	vk::DeviceMemory m_indexBufferMemory;
 	std::vector<std::uint32_t> m_indices;
-	
+
 	std::vector<vk::Buffer> m_uniformBuffers;
 	std::vector<vk::DeviceMemory> m_uniformBuffersMemory;
 	std::vector<void*> m_uniformBuffersMapped;
